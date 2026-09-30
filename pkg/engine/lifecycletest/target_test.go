@@ -15,6 +15,7 @@
 package lifecycletest
 
 import (
+	"github.com/pulumi/pulumi/sdk/v3/go/property"
 	"context"
 	"errors"
 	"fmt"
@@ -65,9 +66,9 @@ func TestRefreshTargetChildren(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID: req.ID,
-							Outputs: resource.PropertyMap{
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"count": resource.NewProperty(float64(count)),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -504,9 +505,9 @@ func TestRefreshExcludeTarget(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID: req.ID,
-							Outputs: resource.PropertyMap{
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"count": resource.NewProperty(float64(count)),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -584,9 +585,9 @@ func TestRefreshExcludeChildren(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID: req.ID,
-							Outputs: resource.PropertyMap{
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"count": resource.NewProperty(callCount),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -5284,7 +5285,7 @@ func TestTargetDependentsThroughReadResource(t *testing.T) {
 			return &deploytest.Provider{
 				ReadF: func(_ context.Context, req plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
-						ReadResult: plugin.ReadResult{ID: req.ID, Outputs: resource.PropertyMap{}},
+						ReadResult: plugin.ReadResult{ID: req.ID, Outputs: ptrPropertyMap(property.Map{})},
 						Status:     resource.StatusOK,
 					}, nil
 				},

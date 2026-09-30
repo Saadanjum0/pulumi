@@ -86,7 +86,7 @@ func (p *stubProvider) Configure(ctx context.Context, req ConfigureRequest) (Con
 
 func (p *stubProvider) Read(ctx context.Context, req ReadRequest) (ReadResponse, error) {
 	if p.ReadFunc != nil {
-		props, status, err := p.ReadFunc(req.URN, req.ID, req.Inputs, req.State)
+		props, status, err := p.ReadFunc(req.URN, req.ID, resource.ToResourcePropertyMap(req.Inputs), resource.ToResourcePropertyMap(req.State))
 		return ReadResponse{
 			ReadResult: props,
 			Status:     status,
@@ -104,13 +104,14 @@ func TestProviderServer_Read_respects_ID(t *testing.T) {
 			urn resource.URN, id resource.ID,
 			inputs, state resource.PropertyMap,
 		) (ReadResult, resource.Status, error) {
-			return ReadResult{
-				ID: resource.ID("none"),
-				Outputs: resource.NewPropertyMapFromMap(map[string]any{
-					"result": resource.NewProperty(&resource.Secret{
-						Element: resource.NewProperty(string(id)),
-					}),
+			outputs := resource.FromResourcePropertyMap(resource.NewPropertyMapFromMap(map[string]any{
+				"result": resource.NewProperty(&resource.Secret{
+					Element: resource.NewProperty(string(id)),
 				}),
+			}))
+			return ReadResult{
+				ID:      resource.ID("none"),
+				Outputs: &outputs,
 			}, resource.StatusOK, nil
 		},
 	}

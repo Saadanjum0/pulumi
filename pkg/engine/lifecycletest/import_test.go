@@ -94,8 +94,8 @@ func TestImportOption(t *testing.T) {
 
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs:  readInputs,
-							Outputs: readOutputs,
+							Inputs:  ptrPropertyMap(resource.FromResourcePropertyMap(readInputs)),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							ID:      "imported-id",
 						},
 						Status: resource.StatusOK,
@@ -406,12 +406,12 @@ func TestImportWithDifferingImportIdentifierFormat(t *testing.T) {
 						ReadResult: plugin.ReadResult{
 							// This ID is deliberately not the same as the ID used to import.
 							ID: "id",
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo": resource.NewProperty("bar"),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo": resource.NewProperty("bar"),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -491,8 +491,8 @@ func TestImportUpdatedID(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      actualID,
-							Outputs: resource.PropertyMap{},
-							Inputs:  resource.PropertyMap{},
+							Outputs: ptrPropertyMap(property.Map{}),
+							Inputs:  ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -576,14 +576,14 @@ func TestImportExtensionParameterizedResource(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID: req.ID,
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -747,8 +747,8 @@ func TestImportThenSecretValueDoesNotReplace(t *testing.T) {
 							return plugin.ReadResponse{
 								ReadResult: plugin.ReadResult{
 									ID:      "imported-id",
-									Inputs:  readInputs,
-									Outputs: readOutputs,
+									Inputs:  ptrPropertyMap(resource.FromResourcePropertyMap(readInputs)),
+									Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 								},
 								Status: resource.StatusOK,
 							}, nil
@@ -862,8 +862,8 @@ func TestImportPlan(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      "actual-id",
-							Inputs:  readInputs,
-							Outputs: readOutputs,
+							Inputs:  ptrPropertyMap(resource.FromResourcePropertyMap(readInputs)),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -927,14 +927,14 @@ func TestImportIgnoreChanges(t *testing.T) {
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -989,14 +989,14 @@ func TestImportPlanExistingImport(t *testing.T) {
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1154,13 +1154,13 @@ func TestImportPlanSuppliedInputsMerge(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID: "actual-id",
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewNullProperty(),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1218,14 +1218,14 @@ func TestImportPlanEmptyState(t *testing.T) {
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1272,14 +1272,14 @@ func TestImportPlanSpecificProvider(t *testing.T) {
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1335,16 +1335,16 @@ func TestImportPlanSpecificProperties(t *testing.T) {
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
 								"baz":  resource.NewProperty(2.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
 								"baz":  resource.NewProperty(2.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1422,14 +1422,14 @@ func TestImportIntoParent(t *testing.T) {
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1480,14 +1480,14 @@ func TestImportComponent(t *testing.T) {
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1553,14 +1553,14 @@ func TestImportRemoteComponent(t *testing.T) {
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo":  resource.NewProperty("bar"),
 								"frob": resource.NewProperty(1.0),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1642,8 +1642,8 @@ func TestImportInputDiff(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      "actual-id",
-							Inputs:  readInputs,
-							Outputs: readOutputs,
+							Inputs:  ptrPropertyMap(resource.FromResourcePropertyMap(readInputs)),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1733,8 +1733,8 @@ func TestImportDefaultProvider(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      "actual-id",
-							Inputs:  readInputs,
-							Outputs: readOutputs,
+							Inputs:  ptrPropertyMap(resource.FromResourcePropertyMap(readInputs)),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1853,8 +1853,8 @@ func TestImportWithFailedUpdate(t *testing.T) {
 
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs:  readInputs,
-							Outputs: readOutputs,
+							Inputs:  ptrPropertyMap(resource.FromResourcePropertyMap(readInputs)),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							ID:      "imported-id",
 						},
 						Status: resource.StatusOK,
@@ -1961,12 +1961,12 @@ func TestImportDeleteBeforeReplace(t *testing.T) {
 
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo": resource.NewProperty("bar"),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo": resource.NewProperty("bar"),
-							},
+							})),
 							ID: "imported-id",
 						},
 						Status: resource.StatusOK,
@@ -2032,12 +2032,12 @@ func TestImportIDPreservedAcrossUpdate(t *testing.T) {
 					// so the engine will schedule an Update after the Import.
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Inputs: resource.PropertyMap{
+							Inputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo": resource.NewProperty("live"),
-							},
-							Outputs: resource.PropertyMap{
+							})),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"foo": resource.NewProperty("live"),
-							},
+							})),
 							ID: canonicalID,
 						},
 						Status: resource.StatusOK,

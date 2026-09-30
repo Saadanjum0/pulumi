@@ -183,9 +183,9 @@ func TestExternalRefreshDoesNotCallDiff(t *testing.T) {
 					readCall++
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
-							Outputs: resource.PropertyMap{
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"o1": resource.NewProperty(float64(readCall)),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -268,7 +268,7 @@ func TestRefreshInitFailure(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Outputs: resource.PropertyMap{},
+								Outputs: ptrPropertyMap(property.Map{}),
 							},
 							Status: resource.StatusPartialFailure,
 						}, err
@@ -276,7 +276,7 @@ func TestRefreshInitFailure(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Outputs: res2Outputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(res2Outputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -284,7 +284,7 @@ func TestRefreshInitFailure(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Outputs: resource.PropertyMap{},
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -463,7 +463,7 @@ func TestRefreshDeletePropertyDependencies(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Outputs: resource.PropertyMap{},
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 					}, nil
 				},
@@ -527,7 +527,7 @@ func TestRefreshDeleteDeletedWith(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Outputs: resource.PropertyMap{},
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -647,8 +647,8 @@ func validateRefreshDeleteCombination(t *testing.T, names []string, targets []st
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: req.State,
+								Inputs:  &req.Inputs,
+								Outputs: &req.State,
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -794,22 +794,26 @@ func validateRefreshBasicsCombination(t *testing.T, names []string, targets []st
 		newResource(urnC, "5", true, urnA, urnB),
 	}
 
+	emptyMap := property.Map{}
+	out1 := resource.FromResourcePropertyMap(resource.PropertyMap{"foo": resource.NewProperty("bar")})
+	out4 := resource.FromResourcePropertyMap(resource.PropertyMap{
+		"baz": resource.NewProperty("qux"),
+		"oof": resource.NewProperty("zab"),
+	})
+	in4 := resource.FromResourcePropertyMap(resource.PropertyMap{"oof": resource.NewProperty("zab")})
 	newStates := map[resource.ID]plugin.ReadResult{
 		// A::0 and A::3 will have no changes.
-		"0": {Outputs: resource.PropertyMap{}, Inputs: resource.PropertyMap{}},
-		"3": {Outputs: resource.PropertyMap{}, Inputs: resource.PropertyMap{}},
+		"0": {Outputs: &emptyMap, Inputs: &emptyMap},
+		"3": {Outputs: &emptyMap, Inputs: &emptyMap},
 
 		// B::1 has output-only changes which will not be reported as a refresh diff.
-		"1": {Outputs: resource.PropertyMap{"foo": resource.NewProperty("bar")}, Inputs: resource.PropertyMap{}},
+		"1": {Outputs: &out1, Inputs: &emptyMap},
 
 		// A::4 will have input and output changes. The changes that impact the inputs will be reported
 		// as a refresh diff.
 		"4": {
-			Outputs: resource.PropertyMap{
-				"baz": resource.NewProperty("qux"),
-				"oof": resource.NewProperty("zab"),
-			},
-			Inputs: resource.PropertyMap{"oof": resource.NewProperty("zab")},
+			Outputs: &out4,
+			Inputs:  &in4,
 		},
 
 		// C::2 and C::5 will be deleted.
@@ -871,7 +875,7 @@ func validateRefreshBasicsCombination(t *testing.T, names []string, targets []st
 				} else {
 					// If there were changes to the inputs, we want the result op to be an
 					// OpUpdate. Otherwise we want an OpSame.
-					if reflect.DeepEqual(old.Inputs, expected.Inputs) {
+					if reflect.DeepEqual(old.Inputs, resource.ToResourcePropertyMap(*expected.Inputs)) {
 						assert.Equal(t, deploy.OpSame, resultOp)
 					} else {
 						assert.Equal(t, deploy.OpUpdate, resultOp)
@@ -881,8 +885,8 @@ func validateRefreshBasicsCombination(t *testing.T, names []string, targets []st
 					new = new.Copy()
 
 					// Only the inputs and outputs should have changed (if anything changed).
-					old.Inputs = expected.Inputs
-					old.Outputs = expected.Outputs
+					old.Inputs = resource.ToResourcePropertyMap(*expected.Inputs)
+					old.Outputs = resource.ToResourcePropertyMap(*expected.Outputs)
 
 					// Discard timestamps for refresh test.
 					new.Modified = nil
@@ -930,8 +934,16 @@ func validateRefreshBasicsCombination(t *testing.T, names []string, targets []st
 		// and timestamp.
 		old := oldResources[int(idx)]
 		if targetedForRefresh {
-			old.Inputs = expected.Inputs
-			old.Outputs = expected.Outputs
+			if expected.Inputs != nil {
+				old.Inputs = resource.ToResourcePropertyMap(*expected.Inputs)
+			} else {
+				old.Inputs = nil
+			}
+			if expected.Outputs != nil {
+				old.Outputs = resource.ToResourcePropertyMap(*expected.Outputs)
+			} else {
+				old.Outputs = nil
+			}
 			old.Modified = r.Modified
 		}
 
@@ -970,16 +982,19 @@ func TestCanceledRefresh(t *testing.T) {
 		newResource(urnC, "2", false),
 	}
 
+	out0 := resource.FromResourcePropertyMap(resource.PropertyMap{"foo": resource.NewProperty("bar")})
+	in0 := resource.FromResourcePropertyMap(resource.PropertyMap{"oof": resource.NewProperty("rab")})
+	out1 := resource.FromResourcePropertyMap(resource.PropertyMap{"baz": resource.NewProperty("qux")})
 	newStates := map[resource.ID]plugin.ReadResult{
 		// A::0 will have input and output changes. The changes that impact the inputs will be reported
 		// as a refresh diff.
 		"0": {
-			Outputs: resource.PropertyMap{"foo": resource.NewProperty("bar")},
-			Inputs:  resource.PropertyMap{"oof": resource.NewProperty("rab")},
+			Outputs: &out0,
+			Inputs:  &in0,
 		},
 		// B::1 will have output changes.
 		"1": {
-			Outputs: resource.PropertyMap{"baz": resource.NewProperty("qux")},
+			Outputs: &out1,
 		},
 		// C::2 will be deleted.
 		"2": {},
@@ -1055,9 +1070,13 @@ func TestCanceledRefresh(t *testing.T) {
 				assert.Nil(t, new)
 				assert.Equal(t, deploy.OpDelete, resultOp)
 			} else {
+				var expectedInputs resource.PropertyMap
+				if expected.Inputs != nil {
+					expectedInputs = resource.ToResourcePropertyMap(*expected.Inputs)
+				}
 				// If there were changes to the inputs, we want the result op to be an
 				// OpUpdate. Otherwise we want an OpSame.
-				if reflect.DeepEqual(old.Inputs, expected.Inputs) {
+				if reflect.DeepEqual(old.Inputs, expectedInputs) {
 					assert.Equal(t, deploy.OpSame, resultOp)
 				} else {
 					assert.Equal(t, deploy.OpUpdate, resultOp)
@@ -1066,8 +1085,8 @@ func TestCanceledRefresh(t *testing.T) {
 				// The inputs, outputs and modified timestamps should have changed (if
 				// anything changed at all).
 				old = old.Copy()
-				old.Inputs = expected.Inputs
-				old.Outputs = expected.Outputs
+				old.Inputs = expectedInputs
+				old.Outputs = resource.ToResourcePropertyMap(*expected.Outputs)
 				old.Modified = new.Modified
 
 				assert.Equal(t, old, new)
@@ -1109,8 +1128,12 @@ func TestCanceledRefresh(t *testing.T) {
 
 				// The inputs, outputs and modified timestamps should have changed (if
 				// anything changed at all).
-				old.Inputs = expected.Inputs
-				old.Outputs = expected.Outputs
+				var expectedInputs resource.PropertyMap
+				if expected.Inputs != nil {
+					expectedInputs = resource.ToResourcePropertyMap(*expected.Inputs)
+				}
+				old.Inputs = expectedInputs
+				old.Outputs = resource.ToResourcePropertyMap(*expected.Outputs)
 				old.Modified = r.Modified
 
 				assert.Equal(t, old, r)
@@ -1141,8 +1164,8 @@ func TestRefreshStepWillPersistUpdatedIDs(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      idAfter,
-							Inputs:  resource.PropertyMap{},
-							Outputs: outputs,
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(outputs)),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1257,8 +1280,8 @@ func TestRefreshWithProgram(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: readOutputs,
+								Inputs:  &req.Inputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -1267,8 +1290,8 @@ func TestRefreshWithProgram(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1361,8 +1384,8 @@ func TestRefreshWithProviderThatHasDependencies(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  req.Inputs,
-							Outputs: resource.PropertyMap{},
+							Inputs:  &req.Inputs,
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1486,8 +1509,8 @@ func TestRefreshWithProgramUpdateExplicitProvider(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: readOutputs,
+								Inputs:  &req.Inputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -1496,8 +1519,8 @@ func TestRefreshWithProgramUpdateExplicitProvider(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1624,8 +1647,8 @@ func TestRefreshWithProgramUpdateDefaultProvider(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: readOutputs,
+								Inputs:  &req.Inputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -1634,8 +1657,8 @@ func TestRefreshWithProgramUpdateDefaultProvider(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1759,8 +1782,8 @@ func TestRefreshWithProgramUpdateDefaultProviderWithoutRegistration(t *testing.T
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: readOutputs,
+								Inputs:  &req.Inputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -1769,8 +1792,8 @@ func TestRefreshWithProgramUpdateDefaultProviderWithoutRegistration(t *testing.T
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -1890,8 +1913,8 @@ func TestRefreshWithProgramWithDeletedResource(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: readOutputs,
+								Inputs:  &req.Inputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -1900,8 +1923,8 @@ func TestRefreshWithProgramWithDeletedResource(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -2012,8 +2035,8 @@ func TestRefreshWithBigProgram(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: readOutputs,
+								Inputs:  &req.Inputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -2022,8 +2045,8 @@ func TestRefreshWithBigProgram(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -2132,8 +2155,8 @@ func TestRefreshWithAlias(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: readOutputs,
+								Inputs:  &req.Inputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -2142,8 +2165,8 @@ func TestRefreshWithAlias(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -2258,8 +2281,8 @@ func TestRefreshRunProgramDeletedResource(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -2353,8 +2376,8 @@ func TestRefreshRunProgramDBRReplacedResource(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: req.State,
+								Inputs:  &req.Inputs,
+								Outputs: &req.State,
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -2363,8 +2386,8 @@ func TestRefreshRunProgramDBRReplacedResource(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -2475,8 +2498,8 @@ func TestRefreshRunProgramReplacedResource(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: req.State,
+								Inputs:  &req.Inputs,
+								Outputs: &req.State,
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -2485,8 +2508,8 @@ func TestRefreshRunProgramReplacedResource(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -2587,8 +2610,8 @@ func TestRefreshDeleteParent(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -2804,7 +2827,7 @@ func TestRefreshV2FailedRead(t *testing.T) {
 						}, fmt.Errorf("read failure for %s", req.URN)
 					}
 					return plugin.ReadResponse{
-						ReadResult: plugin.ReadResult{Outputs: resource.PropertyMap{}},
+						ReadResult: plugin.ReadResult{Outputs: ptrPropertyMap(property.Map{})},
 						Status:     resource.StatusOK,
 					}, nil
 				},
@@ -2902,7 +2925,7 @@ func TestRefreshDeletedResourceWithChild(t *testing.T) {
 
 	readF := func(ctx context.Context, req plugin.ReadRequest) (plugin.ReadResponse, error) {
 		return plugin.ReadResponse{
-			ReadResult: plugin.ReadResult{Outputs: resource.PropertyMap{}},
+			ReadResult: plugin.ReadResult{Outputs: ptrPropertyMap(property.Map{})},
 			Status:     resource.StatusOK,
 		}, nil
 	}
@@ -2999,7 +3022,7 @@ func TestRefreshPreservesInputsWhenReadReturnsNoInputs(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Outputs: newOutputsFromRead,
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(newOutputsFromRead)),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -3299,7 +3322,7 @@ func TestRefreshV2ParentChildOrdering(t *testing.T) {
 
 	readF := func(ctx context.Context, req plugin.ReadRequest) (plugin.ReadResponse, error) {
 		return plugin.ReadResponse{
-			ReadResult: plugin.ReadResult{Outputs: resource.PropertyMap{}},
+			ReadResult: plugin.ReadResult{Outputs: ptrPropertyMap(property.Map{})},
 			Status:     resource.StatusOK,
 		}, nil
 	}
@@ -3440,7 +3463,7 @@ func TestRefreshV2ExcludesChildWithExcludedParent(t *testing.T) {
 
 	readF := func(ctx context.Context, req plugin.ReadRequest) (plugin.ReadResponse, error) {
 		return plugin.ReadResponse{
-			ReadResult: plugin.ReadResult{Outputs: resource.PropertyMap{}},
+			ReadResult: plugin.ReadResult{Outputs: ptrPropertyMap(property.Map{})},
 			Status:     resource.StatusOK,
 		}, nil
 	}
@@ -3491,9 +3514,9 @@ func TestRefreshV2ExcludeTarget(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID: req.ID,
-							Outputs: resource.PropertyMap{
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"refreshed": resource.NewProperty(true),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -3572,9 +3595,9 @@ func TestRefreshV2IncludeTarget(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID: req.ID,
-							Outputs: resource.PropertyMap{
+							Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(resource.PropertyMap{
 								"refreshed": resource.NewProperty(true),
-							},
+							})),
 						},
 						Status: resource.StatusOK,
 					}, nil

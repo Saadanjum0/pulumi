@@ -559,15 +559,17 @@ func TestReadStep(t *testing.T) {
 				},
 				provider: &deploytest.Provider{
 					ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
+						readInputs := resource.FromResourcePropertyMap(resource.PropertyMap{
+							"inputs-key": resource.NewProperty("expected-value"),
+						})
+						readOutputs := resource.FromResourcePropertyMap(resource.PropertyMap{
+							"outputs-key": resource.NewProperty("expected-value"),
+						})
 						return plugin.ReadResponse{
 								ReadResult: plugin.ReadResult{
-									ID: "new-id",
-									Inputs: resource.PropertyMap{
-										"inputs-key": resource.NewProperty("expected-value"),
-									},
-									Outputs: resource.PropertyMap{
-										"outputs-key": resource.NewProperty("expected-value"),
-									},
+									ID:      "new-id",
+									Inputs:  &readInputs,
+									Outputs: &readOutputs,
 								},
 								Status: resource.StatusPartialFailure,
 							}, &plugin.InitError{
@@ -829,11 +831,13 @@ func TestRefreshStepPatterns(t *testing.T) {
 			},
 			provider: &deploytest.Provider{
 				ReadF: func(_ context.Context, req plugin.ReadRequest) (plugin.ReadResponse, error) {
+					readInputs := resource.FromResourcePropertyMap(tc.readInputs)
+					readOutputs := resource.FromResourcePropertyMap(tc.readOutputs)
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  tc.readInputs,
-							Outputs: tc.readOutputs,
+							Inputs:  &readInputs,
+							Outputs: &readOutputs,
 						},
 						Status: resource.StatusOK,
 					}, nil
@@ -914,15 +918,17 @@ func TestRefreshStep(t *testing.T) {
 			}, nil, state, nil, nil).(*RefreshStep)
 			s.provider = &deploytest.Provider{
 				ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
+					readInputs := resource.FromResourcePropertyMap(resource.PropertyMap{
+						"inputs-key": resource.NewProperty("expected-value"),
+					})
+					readOutputs := resource.FromResourcePropertyMap(resource.PropertyMap{
+						"outputs-key": resource.NewProperty("expected-value"),
+					})
 					return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
-								ID: "new-id",
-								Inputs: resource.PropertyMap{
-									"inputs-key": resource.NewProperty("expected-value"),
-								},
-								Outputs: resource.PropertyMap{
-									"outputs-key": resource.NewProperty("expected-value"),
-								},
+								ID:      "new-id",
+								Inputs:  &readInputs,
+								Outputs: &readOutputs,
 							},
 							Status: resource.StatusPartialFailure,
 						}, &plugin.InitError{
@@ -1089,9 +1095,10 @@ func TestImportStep(t *testing.T) {
 					},
 					provider: &deploytest.Provider{
 						ReadF: func(context.Context, plugin.ReadRequest) (plugin.ReadResponse, error) {
+							empty := property.Map{}
 							return plugin.ReadResponse{
 								ReadResult: plugin.ReadResult{
-									Outputs: resource.PropertyMap{},
+									Outputs: &empty,
 								},
 								Status: resource.StatusOK,
 							}, nil

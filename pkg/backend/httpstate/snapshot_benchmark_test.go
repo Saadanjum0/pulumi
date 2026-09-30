@@ -135,10 +135,11 @@ func (p *snapshotBenchProvider) Read(ctx context.Context, req plugin.ReadRequest
 	if !ok {
 		return plugin.ReadResponse{}, fmt.Errorf("unknown resource %v", req.URN)
 	}
+	out := resource.FromResourcePropertyMap(outputs)
 	return plugin.ReadResponse{
 		ReadResult: plugin.ReadResult{
 			ID:      "id",
-			Outputs: outputs,
+			Outputs: &out,
 		},
 	}, nil
 }

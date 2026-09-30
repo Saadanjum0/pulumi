@@ -27,6 +27,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/providers"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
+	"github.com/pulumi/pulumi/sdk/v3/go/property"
 	"pgregory.net/rapid"
 )
 
@@ -344,9 +345,10 @@ func (prs ProviderReadSpec) AsReadF() func(context.Context, plugin.ReadRequest) 
 			}
 		}
 
+		empty := property.Map{}
 		return plugin.ReadResponse{
 			ReadResult: plugin.ReadResult{
-				Outputs: resource.PropertyMap{},
+				Outputs: &empty,
 			},
 			Status: resource.StatusOK,
 		}, nil

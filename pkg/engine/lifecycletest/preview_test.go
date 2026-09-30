@@ -53,8 +53,8 @@ func TestPreviewRefreshWithProgram(t *testing.T) {
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
 								ID:      req.ID,
-								Inputs:  req.Inputs,
-								Outputs: readOutputs,
+								Inputs:  &req.Inputs,
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 							},
 							Status: resource.StatusOK,
 						}, nil
@@ -63,8 +63,8 @@ func TestPreviewRefreshWithProgram(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID:      req.ID,
-							Inputs:  resource.PropertyMap{},
-							Outputs: resource.PropertyMap{},
+							Inputs:  ptrPropertyMap(property.Map{}),
+							Outputs: ptrPropertyMap(property.Map{}),
 						},
 						Status: resource.StatusOK,
 					}, nil

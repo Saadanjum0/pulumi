@@ -903,8 +903,8 @@ func TestDestroyWithProgramResourceRead(t *testing.T) {
 
 						return plugin.ReadResponse{
 							ReadResult: plugin.ReadResult{
-								Inputs:  readInputs,
-								Outputs: readOutputs,
+								Inputs:  ptrPropertyMap(resource.FromResourcePropertyMap(readInputs)),
+								Outputs: ptrPropertyMap(resource.FromResourcePropertyMap(readOutputs)),
 								ID:      req.ID,
 							},
 							Status: resource.StatusOK,
