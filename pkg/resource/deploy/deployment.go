@@ -885,7 +885,10 @@ func (d *Deployment) RunHooks(
 			urn, id, name, typ,
 			oldOptions,
 			newOptions,
-			newInputs, oldInputs, newOutputs, oldOutputs,
+			resource.FromResourcePropertyMap(newInputs),
+			resource.FromResourcePropertyMap(oldInputs),
+			resource.FromResourcePropertyMap(newOutputs),
+			resource.FromResourcePropertyMap(oldOutputs),
 		)
 		if err != nil {
 			if hook.IgnoreErrors {
@@ -928,7 +931,9 @@ func (d *Deployment) RunErrorHooks(
 			urn, id, name, typ,
 			oldOptions,
 			newOptions,
-			newInputs, oldInputs, oldOutputs,
+			resource.FromResourcePropertyMap(newInputs),
+			resource.FromResourcePropertyMap(oldInputs),
+			resource.FromResourcePropertyMap(oldOutputs),
 			failedOperation,
 			errors,
 		)
