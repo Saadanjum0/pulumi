@@ -653,7 +653,7 @@ func TestDoCmdResourceUpsertEndToEnd(t *testing.T) {
   }
 }`
 
-	var createdInputs resource.PropertyMap
+	var createdInputs property.Map
 	loaders := []*deploytest.ProviderLoader{
 		deploytest.NewProviderLoader("azure", semver.MustParse("1.0.0"), func() (plugin.Provider, error) {
 			return &deploytest.Provider{
@@ -661,7 +661,7 @@ func TestDoCmdResourceUpsertEndToEnd(t *testing.T) {
 					return plugin.GetSchemaResponse{Schema: []byte(azureSchemaJSON)}, nil
 				},
 				CreateF: func(_ context.Context, req plugin.CreateRequest) (plugin.CreateResponse, error) {
-					createdInputs = resource.ToResourcePropertyMap(req.Properties)
+					createdInputs = req.Properties
 					return plugin.CreateResponse{
 						ID:         "res-1",
 						Properties: req.Properties,
@@ -732,9 +732,8 @@ size = 3
 	assert.Equal(t, tokens.Type("azure:index:myResource"), finalSnap.Resources[1].Type)
 	assert.Equal(t, "myres", finalSnap.Resources[1].URN.Name())
 
-	require.NotNil(t, createdInputs, "provider.Create should have been called")
-	assert.Equal(t, "myres", createdInputs["name"].StringValue())
-	assert.Equal(t, 3.0, createdInputs["size"].NumberValue())
+	assert.Equal(t, "myres", createdInputs.Get("name").AsString())
+	assert.Equal(t, 3.0, createdInputs.Get("size").AsNumber())
 	_ = stderr
 }
 
@@ -755,16 +754,16 @@ func TestDoCmdResourceUpsertStateless(t *testing.T) {
 					return plugin.ReadResponse{
 						ReadResult: plugin.ReadResult{
 							ID: "res-1",
-							Inputs: resource.PropertyMap{
-								"name":    resource.NewProperty("old"),
-								"size":    resource.NewProperty(1.0),
-								"enabled": resource.NewProperty(true),
-							},
-							Outputs: resource.PropertyMap{
-								"name":    resource.NewProperty("old"),
-								"size":    resource.NewProperty(1.0),
-								"enabled": resource.NewProperty(true),
-							},
+							Inputs: new(property.NewMap(map[string]property.Value{
+								"name":    property.New("old"),
+								"size":    property.New(1.0),
+								"enabled": property.New(true),
+							})),
+							Outputs: new(property.NewMap(map[string]property.Value{
+								"name":    property.New("old"),
+								"size":    property.New(1.0),
+								"enabled": property.New(true),
+							})),
 						},
 					}, nil
 				},
@@ -786,15 +785,14 @@ func TestDoCmdResourceUpsertStateless(t *testing.T) {
 				},
 				UpdateF: func(_ context.Context, req plugin.UpdateRequest) (plugin.UpdateResponse, error) {
 					calls = append(calls, "update")
-					newInputs := resource.ToResourcePropertyMap(req.NewInputs)
-					assert.Equal(t, "new", newInputs["name"].StringValue())
-					assert.Equal(t, 2.0, newInputs["size"].NumberValue())
-					_, hasEnabled := newInputs["enabled"]
+					assert.Equal(t, "new", req.NewInputs.Get("name").AsString())
+					assert.Equal(t, 2.0, req.NewInputs.Get("size").AsNumber())
+					_, hasEnabled := req.NewInputs.GetOk("enabled")
 					assert.False(t, hasEnabled, "inputs should be fully replaced, not merged")
 					return plugin.UpdateResponse{
-						Properties: resource.FromResourcePropertyMap(resource.PropertyMap{
-							"name": resource.NewProperty("new"),
-							"size": resource.NewProperty(2.0),
+						Properties: property.NewMap(map[string]property.Value{
+							"name": property.New("new"),
+							"size": property.New(2.0),
 						}),
 					}, nil
 				},
@@ -868,8 +866,8 @@ size = 2
 				ReadF: func(_ context.Context, req plugin.ReadRequest) (plugin.ReadResponse, error) {
 					calls = append(calls, "read")
 					return plugin.ReadResponse{ReadResult: plugin.ReadResult{
-						Inputs:  resource.PropertyMap{},
-						Outputs: resource.PropertyMap{},
+						Inputs:  new(property.Map{}),
+						Outputs: new(property.Map{}),
 					}}, nil
 				},
 				CheckF: func(_ context.Context, req plugin.CheckRequest) (plugin.CheckResponse, error) {
