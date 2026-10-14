@@ -100,6 +100,15 @@ type SameStep struct {
 	// If this is a same-step emitted for a resource that was not included in a
 	// target-constrained operation.
 	untargeted bool
+
+	// A list of URNs (all dependencies of the step) that this step needs to wait on before completing. In
+	// untargeted same steps this is used to wait for any dependencies that may no longer be in the users
+	// program, but still in the state, so they need to be waited on to have correct state ordering.  They are
+	// turned into waitTokens when the step is applied, so URNs that no longer exist in the program don't get a
+	// wait token and will not be waited on to prevent deadlocks.
+	waitURNs []resource.URN
+	// The list of completion tokens that the step actually waits on.
+	waitTokens []completionToken
 }
 
 var _ Step = (*SameStep)(nil)
@@ -129,9 +138,12 @@ func NewSameStep(deployment *Deployment, reg RegisterResourceEvent, old, new *pk
 
 // NewUntargetedSameStep produces a SameStep for a resource that is only "same" because it was not
 // included in a target-constrained operation, as opposed to having been diffed and found unchanged.
-func NewUntargetedSameStep(deployment *Deployment, reg RegisterResourceEvent, old, new *pkgresource.State) Step {
+func NewUntargetedSameStep(
+	deployment *Deployment, reg RegisterResourceEvent, old, new *pkgresource.State, waitURNs []resource.URN,
+) Step {
 	step := NewSameStep(deployment, reg, old, new).(*SameStep)
 	step.untargeted = true
+	step.waitURNs = waitURNs
 	return step
 }
 
@@ -1380,8 +1392,8 @@ func (s *ReadStep) Apply() (resource.Status, StepCompleteFunc, error) {
 			Name:                  urn.Name(),
 			Type:                  urn.Type(),
 			ID:                    id,
-			Inputs:                s.new.Inputs,
-			State:                 s.new.Inputs,
+			Inputs:                resource.FromResourcePropertyMap(s.new.Inputs),
+			State:                 resource.FromResourcePropertyMap(s.new.Inputs),
 			Timeout:               s.new.CustomTimeouts.Read,
 			ResourceStatusAddress: resourceStatusAddress,
 			ResourceStatusToken:   resourceStatusToken,
@@ -1407,7 +1419,7 @@ func (s *ReadStep) Apply() (resource.Status, StepCompleteFunc, error) {
 		if result.Outputs == nil {
 			return resource.StatusOK, nil, fmt.Errorf("resource '%s' does not exist", id)
 		}
-		s.new.Outputs = result.Outputs
+		s.new.Outputs = resource.ToResourcePropertyMap(*result.Outputs)
 
 		if result.ID != "" {
 			s.new.ID = result.ID
@@ -1634,8 +1646,8 @@ func (s *RefreshStep) Apply() (resource.Status, StepCompleteFunc, error) {
 		Name:                  s.new.URN.Name(),
 		Type:                  s.new.URN.Type(),
 		ID:                    resourceID,
-		Inputs:                s.old.Inputs,
-		State:                 s.old.Outputs,
+		Inputs:                resource.FromResourcePropertyMap(s.old.Inputs),
+		State:                 resource.FromResourcePropertyMap(s.old.Outputs),
 		Timeout:               s.old.CustomTimeouts.Read,
 		ResourceStatusAddress: resourceStatusAddress,
 		ResourceStatusToken:   resourceStatusToken,
@@ -1662,19 +1674,26 @@ func (s *RefreshStep) Apply() (resource.Status, StepCompleteFunc, error) {
 		}
 	}
 
+	var refreshedInputs, refreshedOutputs resource.PropertyMap
+	if refreshed.Inputs != nil {
+		refreshedInputs = resource.ToResourcePropertyMap(*refreshed.Inputs)
+	}
+	if refreshed.Outputs != nil {
+		refreshedOutputs = resource.ToResourcePropertyMap(*refreshed.Outputs)
+	}
 	logging.V(10).Infof("Refreshed resource ID: %q, Inputs: #%d, Outputs: #%d",
-		refreshed.ID, len(refreshed.Inputs), len(refreshed.Outputs))
+		refreshed.ID, len(refreshedInputs), len(refreshedOutputs))
 
 	// If the ID is blank treat this as a delete, and leave outputs blank.
 	var outputs resource.PropertyMap
 	if refreshed.ID != "" {
-		outputs = refreshed.Outputs
+		outputs = refreshedOutputs
 	}
 
 	// If the provider specified new inputs for this resource, pick them up now. Otherwise, retain the current inputs.
 	inputs := s.old.Inputs
 	if refreshed.Inputs != nil {
-		inputs = refreshed.Inputs
+		inputs = refreshedInputs
 	}
 
 	if outputs != nil {
@@ -1711,8 +1730,8 @@ func (s *RefreshStep) Apply() (resource.Status, StepCompleteFunc, error) {
 			// * The user has explicitly opted into this legacy behaviour by setting
 			//   the `UseLegacyRefreshDiff` option to true.
 			if s.old.External || s.deployment.opts.UseLegacyRefreshDiff {
-				inputsChange = !refreshed.Inputs.DeepEquals(s.old.Inputs)
-				outputsChange = !refreshed.Outputs.DeepEquals(s.old.Outputs)
+				inputsChange = !refreshedInputs.DeepEquals(s.old.Inputs)
+				outputsChange = !refreshedOutputs.DeepEquals(s.old.Outputs)
 			} else {
 				inputsChange = !inputs.DeepEquals(s.old.Inputs)
 				outputsChange = !outputs.DeepEquals(s.old.Outputs)
@@ -2124,10 +2143,11 @@ func (s *ImportStep) Apply() (_ resource.Status, _ StepCompleteFunc, err error) 
 		} else {
 			s.new.ID = s.new.ImportID
 		}
-		inputs = read.Inputs
-		outputs = read.Outputs
+		readInputs := resource.ToResourcePropertyMap(*read.Inputs)
+		inputs = readInputs
+		outputs = resource.ToResourcePropertyMap(*read.Outputs)
 		if s.planned {
-			inputs = mergeSuppliedProperties(read.Inputs, suppliedInputs)
+			inputs = mergeSuppliedProperties(readInputs, suppliedInputs)
 		}
 		s.new.RefreshBeforeUpdate = read.RefreshBeforeUpdate
 	} else {
